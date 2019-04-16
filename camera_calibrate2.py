@@ -50,8 +50,8 @@ print("Number of images",len(objpoints))
 
 from random import sample 
 
-for i in range(15):
-        sampled = sample(list(range(len(objpoints))),80)
+for i in range(10):
+        sampled = sample(list(range(len(objpoints))),100)
         objpoints_sampled = list(np.array(objpoints)[sampled])
         imgpoints_sampled = list(np.array(imgpoints)[sampled])
         print(len(objpoints_sampled), len(imgpoints_sampled))
@@ -65,8 +65,5 @@ for i in range(15):
         camera_matrices.append(np.array(mtx))
         distortion_matrices.append(np.array(dist))
 
-print(np.sum(camera_matrices)/15)
-print(np.sum(distortion_matrices)/15)
-cv2.destroyAllWindows()
 
 

@@ -25,18 +25,14 @@ from utils import WeightReader, decode_netout, draw_boxes
 import json
 import numpy as np
 from sklearn import preprocessing
-import keras
 from keras.layers import Input,Dense,Lambda
 from keras.models import Model
-import os
-import numpy as np
 from keras.preprocessing import image as image_p
 from keras.applications.imagenet_utils import preprocess_input
 from keras.applications.vgg16 import VGG16
 import time
 from sklearn.model_selection import train_test_split
 from keras.preprocessing.image import ImageDataGenerator
-import pickle
 import matplotlib.image as mpimg
 from keras.preprocessing import image
 from  matplotlib import pyplot
@@ -49,7 +45,6 @@ from keras.layers import Reshape
 import keras.backend as K
 import math
 
-#import keras
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
@@ -63,7 +58,6 @@ from sklearn import preprocessing
 import os
 import numpy as np
 from sklearn.model_selection import train_test_split
-import pickle
 import matplotlib.image as mpimg
 from  matplotlib import pyplot
 import random
@@ -89,7 +83,6 @@ from keras.applications.vgg16 import VGG16
 import time
 from sklearn.model_selection import train_test_split
 from keras.preprocessing.image import ImageDataGenerator
-import pickle
 import matplotlib.image as mpimg
 from keras.preprocessing import image
 from  matplotlib import pyplot
@@ -130,12 +123,16 @@ import argparse
 ap = argparse.ArgumentParser()
 ap.add_argument("-w", "--weight", type=str, required=True,help="weights")
 ap.add_argument("-cfg", "--config", type=str, required=True,help="configuration")
+ap.add_argument("-s", "--size", type=str, required=True,help="big or small")
 args = vars(ap.parse_args())
 weights_path = args["weight"]
 config_path = args["config"]
+hoop_size = args["size"]
+
 
 print(weights_path)
 print(config_path)
+print(hoop_size)
 
 def isRotationMatrix(R) :
     Rt = np.transpose(R)
@@ -179,7 +176,7 @@ ANCHORS          = [0.1,0.1,0.7,0.7,2,2,5,5,9,9]
 TRUE_BOX_BUFFER  = 50
 
 
-model_points = np.array([
+model_points_big = np.array([
                                         (-40, 13, 0.0),
                                         (-25,-34, 0.0),
                                         (0, 42, 0.0), 
@@ -187,8 +184,20 @@ model_points = np.array([
                                         (40,13, 0.0)
                                     ])
 
+model_points_small = np.array([
+                                        (-32, 11, 0.0),
+                                        (-20,-28, 0.0),
+                                        (0, 34, 0.0), 
+                                        (20,-28, 0.0),
+                                        (32,11, 0.0)
+                                    ])
 
-
+if hoop_size=="small":
+    model_points = model_points_small
+else:
+    model_points = model_points_big 
+    
+print("Model config",model_points)    
 def process_image_keypoints(img,bbox_coords):
     desired_size = 224
 
@@ -369,7 +378,7 @@ vidcap = cv2.VideoCapture('rtsp://admin:admin@192.168.214.40/h264.sdp?res=half&x
 
 seconds = 0.5
 fps = vidcap.get(cv2.CAP_PROP_FPS) # Gets the frames per second
-multiplier = 10
+multiplier = 5
 
 
 success,image = vidcap.read()
@@ -481,12 +490,12 @@ while success:
         print("Sorted points",image_points)
         
         if contour5_flag==True:
-                if image_points[0][1]<image_points[1][1]:
-                        temp = image_points[1]
+                if image_points[0][1]>image_points[1][1]:
+                        temp = np.copy(image_points[1])
                         image_points[1] = image_points[0]
                         image_points[0] = temp 
-                if image_points[2][1]<image_points[3][1]:
-                        temp = image_points[3]
+                if image_points[2][1]>image_points[3][1]:
+                        temp = np.copy(image_points[3])
                         image_points[3] = image_points[2]
                         image_points[2] = temp
                 
@@ -500,15 +509,19 @@ while success:
             # Camera internals
 
             size = image.shape
-            focal_length = size[1]
-            center = (size[1]/2, size[0]/2)
+            #focal_length = size[1]
+            #center = (size[1]/2, size[0]/2)
+            focal_length = 780
+            center = (479.72, 104.56)
             camera_matrix = np.array(
-                                     [[focal_length, 0, center[0]],
-                                     [0, focal_length, center[1]],
+                                     [[768.31, 0, center[0]],
+                                     [0, 768.21, center[1]],
                                      [0, 0, 1]], dtype = "double"
                                      )
 
-            dist_coeffs = np.zeros((4,1)) # Assuming no lens distortion
+            #dist_coeffs = np.zeros((4,1)) # Assuming no lens distortion
+            #dist_coeffs = np.zeros((5,1)) # Assuming no lens distortion
+            dist_coeffs = np.array([[-0.3023023,0.14315257,-0.00201115,-0.00041268,-0.04129913]])
             (success, rotation_vector, translation_vector) = cv2.solvePnP(model_points, image_points, camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_ITERATIVE)
 
 
@@ -538,8 +551,11 @@ while success:
             text= "position in cm:"+str(round(translation_vector[0][0],1))+","+str(round(translation_vector[1][0],1))+","+str(round(translation_vector[2][0],1))
             cv2.putText(image,text,(20,40), cv2.FONT_HERSHEY_SIMPLEX, 0.8,(255,0,0),2,cv2.LINE_AA)
             
-            #text= "yaw,pitch,roll in deg:"+ str(round(euler_angles[0],1))+","+str(round(euler_angles[1],1))+","+str(round(euler_angles[2],1))
-            text= "distance,heading,elevation in cm:"+str(round(np.linalg.norm(translation_vector)/100,2))+","+str(round(heading,1))+","+str(round(elevation,1))
+            
+            text= "distance,heading,elevation in m,deg,deg:"+str(round(np.linalg.norm(translation_vector)/100,2))+","+str(round(heading,1))+","+str(round(elevation,1))
+            
+            cv2.putText(image,text,(20,image.shape[0]-70), cv2.FONT_HERSHEY_SIMPLEX, 0.8,(255,0,0),2,cv2.LINE_AA)
+            text= "yaw,pitch,roll in deg:"+ str(round(euler_angles[0],1))+","+str(round(euler_angles[1],1))+","+str(round(euler_angles[2],1))
             cv2.putText(image,text,(20,image.shape[0]-40), cv2.FONT_HERSHEY_SIMPLEX, 0.8,(255,0,0),2,cv2.LINE_AA)
 
             
@@ -569,6 +585,8 @@ while success:
     
     if frameId % multiplier==0:
         cv2.imshow('frame',image)
+        count = count + 1
+        #cv2.imwrite("stream4_images/"+str(count)+".jpg",image)
         logger.info("Message 1 is %s",m1.convert_to_string())
         logger.info("Message 2 is %s",m2.convert_to_string())
     
