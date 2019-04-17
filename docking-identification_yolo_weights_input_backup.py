@@ -21,7 +21,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 import pickle
 from utils import WeightReader, decode_netout, draw_boxes
-from numpy.linalg import inv
 
 import json
 import numpy as np
@@ -100,6 +99,7 @@ import tensorflow as tf
 from keras.applications.vgg16 import VGG16
 
 
+from keras.datasets import imdb
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.layers import Conv2D,MaxPooling2D,Flatten,Conv1D,Softmax
@@ -112,12 +112,27 @@ import sys
 import os
 from datetime import datetime
 from keras.models import model_from_json
+
 from tensorflow.python.client import device_lib
 from sklearn.cluster import KMeans
-import argparse
-
-
+            
 device_lib.list_local_devices()
+
+
+import argparse
+ap = argparse.ArgumentParser()
+ap.add_argument("-w", "--weight", type=str, required=True,help="weights")
+ap.add_argument("-cfg", "--config", type=str, required=True,help="configuration")
+ap.add_argument("-s", "--size", type=str, required=True,help="big or small")
+args = vars(ap.parse_args())
+weights_path = args["weight"]
+config_path = args["config"]
+hoop_size = args["size"]
+
+
+print(weights_path)
+print(config_path)
+print(hoop_size)
 
 def isRotationMatrix(R) :
     Rt = np.transpose(R)
@@ -146,6 +161,43 @@ def rotationMatrixToEulerAngles(R) :
     return np.degrees(np.array([x, y, z]))
 
 
+
+server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+server.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+server.settimeout(0.2)
+
+
+LABELS = ['station']
+CLASS            = len(LABELS)
+CLASS_WEIGHTS    = np.ones(CLASS, dtype='float32')
+#ANCHORS          = [0.57273, 0.677385, 1.87446, 2.06253, 3.33843, 5.47434, 7.88282, 3.52778, 9.77052, 9.16828]
+ANCHORS          = [0.1,0.1,0.7,0.7,2,2,5,5,9,9]
+TRUE_BOX_BUFFER  = 50
+
+
+model_points_big = np.array([
+                                        (-40, 13, 0.0),
+                                        (-25,-34, 0.0),
+                                        (0, 42, 0.0), 
+                                        (25,-34, 0.0),
+                                        (40,13, 0.0)
+                                    ])
+
+model_points_small = np.array([
+                                        (-32, 11, 0.0),
+                                        (-20,-28, 0.0),
+                                        (0, 34, 0.0), 
+                                        (20,-28, 0.0),
+                                        (32,11, 0.0)
+                                    ])
+
+if hoop_size=="small":
+    model_points = model_points_small
+else:
+    model_points = model_points_big 
+    
+print("Model config",model_points)    
 def process_image_keypoints(img,bbox_coords):
     desired_size = 224
 
@@ -200,7 +252,28 @@ def process_image_keypoints_nobox(img):
         value=color)
 
     return new_im,[left,top,ratio]
+
+
+# In[10]:
+
+
+with open(config_path,'rb') as f:
+    cfg = pickle.load(f)
+    model = model_from_json(cfg)
     
+
+with open(weights_path,'rb') as f:
+    weights = pickle.load(f)
+    model.set_weights(weights)
+
+
+#idx = 500
+#image = cv2.imread('/tf/data/stream3_images/'+str(idx)+'.jpg')
+#image = cv2.imread('/tf/data/stream2/7202.jpg')
+
+
+print("-----------------------------------")
+
 class Message:
     def __init__(self):    
         self.message_type = "001"
@@ -297,120 +370,15 @@ class Message2:
     	calc_cksum = 0
     	for s in chk_sum_string:
     	    	calc_cksum ^= ord(s)
-    	self.checksum = str(hex(calc_cksum)).lstrip("0").lstrip("x")    
+    	self.checksum = str(hex(calc_cksum)).lstrip("0").lstrip("x")
 
 
-print("----------------------------------------------------------------------------------------------------")
-
-
-
-
-
-
-
-
-
-ap = argparse.ArgumentParser()
-ap.add_argument("-w", "--weight", type=str, required=True,help="weights")
-ap.add_argument("-cfg", "--config", type=str, required=True,help="configuration")
-ap.add_argument("-s", "--size", type=str, required=True,choices=['big','small'],help="big or small")
-ap.add_argument("-src", "--source", type=str, required=False,choices=['video','stream'],help="video or stream")
-ap.add_argument("-l", "--lights", type=str, required=False,choices=['True','False'],help="show light coordinates or not")
-ap.add_argument("-save_train", "--save_train", type=str, required=False,choices=['True','False'],help="save data to folder for training")
-ap.add_argument("-save_video", "--save_video", type=str, required=False,choices=['True','False'],help="save data to folder for creating video")
-ap.add_argument("-skip", "--skip", type=str, required=False,help="process every nth frame")
-args = vars(ap.parse_args())
-weights_path = args["weight"]
-config_path = args["config"]
-hoop_size = args["size"]
-source =  "stream "if args["source"]==None else args["source"]
-show_lights = True if args["lights"]=='True' else False
-multiplier = 5 if args["skip"]==None else int(args["skip"])
-save_data_for_training = True if args["save_train"]=='True' else False
-save_data_for_video = True if args["save_video"]=='True' else False     
-
-
-print(weights_path)
-print(config_path)
-print(hoop_size)
-print("Source is",source)
-print("show lights is",show_lights)
-print("Processing every nth frame",multiplier)
-print(args)
-
-
-server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-server.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-server.settimeout(0.2)
-
-
-LABELS = ['station']
-CLASS            = len(LABELS)
-CLASS_WEIGHTS    = np.ones(CLASS, dtype='float32')
-#ANCHORS          = [0.57273, 0.677385, 1.87446, 2.06253, 3.33843, 5.47434, 7.88282, 3.52778, 9.77052, 9.16828]
-ANCHORS          = [0.1,0.1,0.7,0.7,2,2,5,5,9,9]
-TRUE_BOX_BUFFER  = 50
-
-
-
-
-model_points_big = np.array([
-                                        (-40, 13, 0.0),
-                                        (-25,-34, 0.0),
-                                        (0, 42, 0.0), 
-                                        (25,-34, 0.0),
-                                        (40,13, 0.0)
-                                    ])
-
-model_points_small = np.array([
-                                        (-32, 11, 0.0),
-                                        (-20,-28, 0.0),
-                                        (0, 34, 0.0), 
-                                        (20,-28, 0.0),
-                                        (32,11, 0.0)
-                                    ])
-if source=="stream":
-        vidcap = cv2.VideoCapture('rtsp://admin:admin@192.168.214.40/h264.sdp?res=half&x0=0&y0=0&x1=1920&y1=1080&qp=16&doublescan=0&ssn=41645')
-else:
-        vidcap = cv2.VideoCapture('stream3.mp4')
-
-
-if hoop_size=="small":
-    model_points = model_points_small
-else:
-    model_points = model_points_big 
-    
-print("Model config",model_points)    
-
-# In[10]:
-
-
-with open(config_path,'rb') as f:
-    cfg = pickle.load(f)
-    model = model_from_json(cfg)
-    
-
-with open(weights_path,'rb') as f:
-    weights = pickle.load(f)
-    model.set_weights(weights)
-
-
-#idx = 500
-#image = cv2.imread('/tf/data/stream3_images/'+str(idx)+'.jpg')
-#image = cv2.imread('/tf/data/stream2/7202.jpg')
-
-
-
-
-
-
-
-
+#vidcap = cv2.VideoCapture('stream3.mp4')
+vidcap = cv2.VideoCapture('rtsp://admin:admin@192.168.214.40/h264.sdp?res=half&x0=0&y0=0&x1=1920&y1=1080&qp=16&doublescan=0&ssn=41645')
 
 seconds = 0.5
-#fps = vidcap.get(cv2.CAP_PROP_FPS) # Gets the frames per second
-
+fps = vidcap.get(cv2.CAP_PROP_FPS) # Gets the frames per second
+multiplier = 10
 
 
 success,image = vidcap.read()
@@ -424,6 +392,7 @@ try:
 except:
     print("exsits")
 
+print("Multiplier",multiplier)
 
 dummy_array = np.zeros((1,1,1,1,TRUE_BOX_BUFFER,4))
 
@@ -531,10 +500,9 @@ while success:
                         image_points[2] = temp
                 
         print("Sorted altered points",image_points)      
+        m2.fill_light_positions(image_points)
         m1.set_number_of_lights(len(image_points))
         m2.set_number_of_lights(len(image_points))
-        
-        m2.fill_light_positions(image_points)
         if contour5_flag==True:
             logger.info("entered")
             
@@ -555,12 +523,6 @@ while success:
             #dist_coeffs = np.zeros((5,1)) # Assuming no lens distortion
             dist_coeffs = np.array([[-0.3023023,0.14315257,-0.00201115,-0.00041268,-0.04129913]])
             (success, rotation_vector, translation_vector) = cv2.solvePnP(model_points, image_points, camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_ITERATIVE)
-            print("euler calcluting")
-            print(rotation_vector)
-            rot_mat, _ = cv2.Rodrigues(rotation_vector)
-            print(rot_mat)  
-            euler_angles = rotationMatrixToEulerAngles(rot_mat)
-            logger.info("euler calculated")
 
 
 
@@ -570,27 +532,20 @@ while success:
 
             #(nose_end_point2D, jacobian) = cv2.projectPoints(np.array([(0.0, 42.0, 50.0)]), rotation_vector, translation_vector, camera_matrix, dist_coeffs)
             #print(nose_end_point2D)
-            #light_world_coordinates = []
-            #try:
-            #            inv_rot_mat  = inv(rot_mat);
-            #            inv_camera_matrix  = inv(cameraMatrix) 
-            #            rightSideMat = inv_rot_mat* tvec;
-            #            for idx in range(model_points.shape[0]):
-            #	            model_points[idx]
-            # 	            light_world_coordinates.append(light_coords[0][0][0]) 
             for p in image_points:
             	cv2.circle(image, (int(p[0]), int(p[1])), 3, (0,0,255), -1)
-            	#text = str(light_world_coordinates[idx][0])+","+str(light_world_coordinates[idx][1])
-            	#cv2.putText(image,text,(int(p[0])-1, int(p[1])-1), cv2.FONT_HERSHEY_SIMPLEX, 0.8,(255,0,0),2,cv2.LINE_AA)
 
-            
+            print("euler calcluting")
+            print(rotation_vector)
+            rot_mat, _ = cv2.Rodrigues(rotation_vector)
+            print(rot_mat)  
+            euler_angles = rotationMatrixToEulerAngles(rot_mat)
+            logger.info("euler calculated")
             print("Euler angles ",euler_angles)
             print("Translation angles",translation_vector)
             heading = np.degrees(np.arctan2(translation_vector[0][0],translation_vector[2][0]))
             elevation = np.degrees(np.arctan2(translation_vector[1][0],translation_vector[2][0]))
             m1.fill_target_heading_elevation(translation_vector,heading,elevation)
-            
-        
 
            
             text= "position in cm:"+str(round(translation_vector[0][0],1))+","+str(round(translation_vector[1][0],1))+","+str(round(translation_vector[2][0],1))
@@ -628,10 +583,10 @@ while success:
     m2.set_checksum()
     m2.set_camera_status(success)
     
-    
     if frameId % multiplier==0:
         cv2.imshow('frame',image)
-        count = count + 1 
+        count = count + 1
+        #cv2.imwrite("stream4_images/"+str(count)+".jpg",image)
         logger.info("Message 1 is %s",m1.convert_to_string())
         logger.info("Message 2 is %s",m2.convert_to_string())
     
@@ -639,15 +594,8 @@ while success:
         server.sendto(m2.convert_to_string().encode(), ('<broadcast>', 51120))
     
     
-    if save_data_for_video==True and frameId % multiplier==0:
-        cv2.imwrite("stream_video/"+str(count)+".jpg",image)
-        
+    
     success,image = vidcap.read()
-    
-    
-    if save_data_for_training==True and frameId % multiplier==0:
-        cv2.imwrite("stream_training/"+str(count)+".jpg",image)
-        
     print('Read a new frame: ', success)
     
 
