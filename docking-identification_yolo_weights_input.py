@@ -635,8 +635,8 @@ while success:
         logger.info("Message 1 is %s",m1.convert_to_string())
         logger.info("Message 2 is %s",m2.convert_to_string())
     
-        server.sendto(m1.convert_to_string().encode(), ('<broadcast>', 51110))
-        server.sendto(m2.convert_to_string().encode(), ('<broadcast>', 51120))
+        #server.sendto(m1.convert_to_string().encode(), ('<broadcast>', 51110))
+        #server.sendto(m2.convert_to_string().encode(), ('<broadcast>', 51120))
     
     
     if save_data_for_video==True and frameId % multiplier==0:

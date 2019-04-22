@@ -4,7 +4,7 @@
 # In[1]:
 
 
-import keras
+#import keras
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
@@ -67,7 +67,13 @@ import numpy
 
 import math
 
-
+import tensorflow as tf
+from keras.backend.tensorflow_backend import set_session
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
+sess = tf.Session(config=config)
+set_session(sess)  # set this TensorFlow session as the default session for Keras
+device_lib.list_local_devices()
 
 import json
 import numpy as np
@@ -95,7 +101,6 @@ from keras.layers import Reshape,merge,Concatenate,Add,Dropout
 import keras.backend as K
 import math
 from keras.activations import softmax,tanh
-import tensorflow as tf
 from keras.applications.vgg16 import VGG16
 
 
@@ -113,10 +118,11 @@ import os
 from datetime import datetime
 from keras.models import model_from_json
 
-from tensorflow.python.client import device_lib
+
 from sklearn.cluster import KMeans
             
-device_lib.list_local_devices()
+
+
 
 
 import argparse
@@ -590,8 +596,8 @@ while success:
         logger.info("Message 1 is %s",m1.convert_to_string())
         logger.info("Message 2 is %s",m2.convert_to_string())
     
-        server.sendto(m1.convert_to_string().encode(), ('<broadcast>', 51110))
-        server.sendto(m2.convert_to_string().encode(), ('<broadcast>', 51120))
+        #server.sendto(m1.convert_to_string().encode(), ('<broadcast>', 51110))
+        #server.sendto(m2.convert_to_string().encode(), ('<broadcast>', 51120))
     
     
     

@@ -4,19 +4,19 @@ import glob
 import os
  
 img_array = []
-dirFiles= os.listdir("stream4_images/")
+dirFiles= os.listdir("/home/nvidia/Videos/data/new/stream_training/")
 #dirFiles.sort(key=lambda f: int(filter(str.isdigit, f)))
 dirFiles = sorted(dirFiles,key=lambda x: int(os.path.splitext(x)[0]))
 for filename in dirFiles:
     print(filename)
-    img = cv2.imread("stream4_images/"+filename)
+    img = cv2.imread("/home/nvidia/Videos/data/new/stream_training/"+filename)
     height, width, layers = img.shape
     size = (width,height)
     img_array.append(img)
  
- 
-out = cv2.VideoWriter('new_video.avi',cv2.VideoWriter_fourcc(*'DIVX'), 15, size)
- 
+print("hewyy") 
+out = cv2.VideoWriter('new_video2.avi',cv2.VideoWriter_fourcc(*'DIVX'), 15, size)
+print("heww") 
 for i in range(len(img_array)):
     out.write(img_array[i])
 out.release()

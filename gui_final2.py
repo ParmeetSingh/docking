@@ -185,7 +185,7 @@ class WidgetGallery(QDialog):
 
         radioButton1 = QRadioButton("Stream")
         openVideo = QPushButton("Open Video")
-        self.file_link = QLineEdit('stream3.mp4')
+        self.file_link = QLineEdit('stream2.mp4')
         #lineEdit = QLineEdit('rtsp://admin:admin@192.168.214.40/h264.sdp?res=half&x0=0&y0=0&x1=1920&y1=1080&qp=16&doublescan=0&ssn=41645')
        
         radioButton1.toggled.connect(openVideo.setDisabled)
