@@ -247,8 +247,8 @@ class WidgetGallery(QDialog):
         layout = QGridLayout()
         layout.addWidget(self.defaultPushButton, 0, 0, 1, 2)
         layout.addWidget(self.togglePushButton, 1, 0, 1, 2)
-        layout.addWidget(self.tst_btn,2, 0, 1, 2)
-        layout.addWidget(self.stream_tst_btn,3, 0, 1, 2)
+        #layout.addWidget(self.tst_btn,2, 0, 1, 2)
+        layout.addWidget(self.stream_tst_btn,2, 0, 1, 2)
         #layout.addStretch(1)
         self.topRightGroupBox.setLayout(layout)
     def ping_to_stream(self):
