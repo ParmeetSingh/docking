@@ -1,0 +1,2 @@
+echo nvidia | sudo -S ifconfig eth0 192.168.214.41 up
+cd ~/docking

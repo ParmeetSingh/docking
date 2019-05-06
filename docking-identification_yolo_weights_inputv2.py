@@ -20,7 +20,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 import pickle
-from utils import WeightReader, decode_netout, draw_boxes
+from utils import WeightReader, decode_netout, draw_boxes, Message,Message2
 from numpy.linalg import inv
 
 import json
@@ -97,6 +97,7 @@ import keras.backend as K
 import math
 from keras.activations import softmax,tanh
 import tensorflow as tf
+from tensorflow.python.client import device_lib
 from keras.applications.vgg16 import VGG16
 
 
@@ -112,12 +113,18 @@ import sys
 import os
 from datetime import datetime
 from keras.models import model_from_json
-from tensorflow.python.client import device_lib
+
 from sklearn.cluster import KMeans
 import argparse
+import sys
+import tensorflow as tf
+
+config = tf.ConfigProto()
+config.gpu_options.allow_growth=True
+sess = tf.Session(config=config)
 
 
-device_lib.list_local_devices()
+#device_lib.list_local_devices()
 
 def isRotationMatrix(R) :
     Rt = np.transpose(R)
@@ -208,105 +215,25 @@ def RepresentsInt(s):
     except ValueError:
         return False
             
-class Message:
-    def __init__(self):    
-        self.message_type = "001"
-        self.date = ""
-        self.time = ""
-        self.target_range = -10
-        self.target_heading = 0
-        self.elevation = 0
-        self.target_quality = 1
-        self.number_of_lights = -1
-        self.camera_status = 0
-        self.checksum = ""
-    def set_target_detected(self,target_quality):
-        self.target_quality = target_quality    
-    def set_number_of_lights(self,num_lights):
-        self.number_of_lights = num_lights       
-    def set_camera_status(self,success):
-    	if success==True:
-    		self.camera_status = 1
-    	else:
-    	 	self.camera_status = -1        
-    def convert_to_string(self):
-    	return ",".join(["$PISE","CAM2VCC",self.message_type,self.date,self.time,"{0:.1f}".format(self.target_range),"{0:.1f}".format(self.target_heading),"{0:.1f}".format(self.elevation),str(self.target_quality),str(self.number_of_lights),str(self.camera_status),self.checksum])	
-    def set_date_time(self):
-    	self.date = datetime.now().strftime('%Y%m%d')
-    	self.time = datetime.now().strftime('%H:%M:%S.%f')[:-4]
-    def fill_target_heading_elevation(self,translation_vector,heading,elevation):
-    	x = np.array([translation_vector[0][0],translation_vector[1][0],translation_vector[2][0]])
-    	self.target_range = np.linalg.norm(x)/100#convert cm to m
-    	self.target_heading =  heading
-    	self.elevation =  elevation
-    def set_checksum(self):
-    	chk_sum_string = "".join(["$PISE","CAM2VCC",self.message_type,self.date,self.time,"{0:.1f}".format(self.target_range),"{0:.1f}".format(self.target_heading),"{0:.1f}".format(self.elevation),str(self.target_quality),str(self.number_of_lights),str(self.camera_status)])
-    	calc_cksum = 0
-    	for s in chk_sum_string:
-    	    	calc_cksum ^= ord(s)
-    	self.checksum = str(hex(calc_cksum)).lstrip("0").lstrip("x")
 
-class Message2:
-    def __init__(self):    
-        self.message_type = "002"
-        self.date = ""
-        self.time = ""
-        self.number_lights = 0
-        self.light1_x_pos = 0
-        self.light1_y_pos = 0
-        self.light2_x_pos = 0
-        self.light2_y_pos = 0
-        self.light3_x_pos = 0
-        self.light3_y_pos = 0
-        self.light4_x_pos = 0
-        self.light4_y_pos = 0
-        self.light5_x_pos = 0
-        self.light5_y_pos = 0
-        self.light6_x_pos = 0
-        self.light6_y_pos = 0
-        self.camera_status = 0
-        self.checksum = ""
-    def set_number_of_lights(self,num_lights):
-        self.number_of_lights = num_lights                  
-    def set_camera_status(self,success):
-    	if success==True:
-    		self.camera_status = 1
-    	else:
-    	 	self.camera_status = -1
-    def fill_light_positions(self,image_points):
-    	self.number_lights = len(image_points)
-    	if len(image_points)>=1:
-    		self.light1_x_pos = image_points[0][0][0]
-    		self.light1_y_pos = image_points[0][1][0]
-    	if len(image_points)>=2:
-    		self.light2_x_pos = image_points[1][0][0]
-    		self.light2_y_pos = image_points[1][1][0]
-    	if len(image_points)>=3:
-    		self.light3_x_pos = image_points[2][0][0]
-    		self.light3_y_pos = image_points[2][1][0]
-    	if len(image_points)>=4:
-    		self.light4_x_pos = image_points[3][0][0]
-    		self.light4_y_pos = image_points[3][1][0]
-    	if len(image_points)>=5:
-    		self.light5_x_pos = image_points[4][0][0]
-    		self.light5_y_pos = image_points[4][1][0]
-    	if len(image_points)>=6:
-    		self.light6_x_pos = image_points[5][0][0]
-    		self.light6_y_pos = image_points[5][1][0] 
-    def convert_to_string(self):
-        print(self.message_type)
-        return ",".join(["$PISE","CAM2VCC",self.message_type,self.date,self.time,str(self.number_lights),"{0:.1f}".format(self.light1_x_pos),"{0:.1f}".format(self.light1_y_pos),"{0:.1f}".format(self.light2_x_pos),"{0:.1f}".format(self.light2_y_pos),"{0:.1f}".format(self.light3_x_pos),"{0:.1f}".format(self.light3_y_pos),"{0:.1f}".format(self.light4_x_pos),"{0:.1f}".format(self.light4_y_pos),"{0:.1f}".format(self.light5_x_pos),"{0:.1f}".format(self.light5_y_pos),"{0:.1f}".format(self.light6_x_pos),"{0:.1f}".format(self.light6_y_pos),str(self.camera_status),str(self.checksum)])
-    def set_date_time(self):
-    	self.date = datetime.now().strftime('%Y%m%d')
-    	self.time = datetime.now().strftime('%H:%M:%S.%f')[:-4]	        
-    def set_checksum(self):
-    	chk_sum_string = "".join(["$PISE","CAM2VCC",self.message_type,self.date,self.time,str(self.number_lights),"{0:.1f}".format(self.light1_x_pos),"{0:.1f}".format(self.light1_y_pos),"{0:.1f}".format(self.light2_x_pos),"{0:.1f}".format(self.light2_y_pos),"{0:.1f}".format(self.light3_x_pos),"{0:.1f}".format(self.light3_y_pos),"{0:.1f}".format(self.light4_x_pos),"{0:.1f}".format(self.light4_y_pos),"{0:.1f}".format(self.light5_x_pos),"{0:.1f}".format(self.light5_y_pos),"{0:.1f}".format(self.light6_x_pos),"{0:.1f}".format(self.light6_y_pos),str(self.camera_status)])
-    	calc_cksum = 0
-    	for s in chk_sum_string:
-    	    	calc_cksum ^= ord(s)
-    	self.checksum = str(hex(calc_cksum)).lstrip("0").lstrip("x")    
+def send_camera_error_messages(server,port1,port2):
+	m1 = Message()
+	m2 = Message()
 
+	m1.set_date_time()
+	m1.set_camera_status(-1)
+	m1.set_checksum()
 
+	m2.set_date_time()
+	m2.set_camera_status(-1)
+	m2.set_checksum()
+	logger.info("Message 1 is %s",m1.convert_to_string())
+	logger.info("Message 2 is %s",m2.convert_to_string())
+
+	print("Sending m1 to port:"+port1)
+	server.sendto(m1.convert_to_string().encode(), ('<broadcast>', int(port1)))
+	print("Sending m2 to port:"+port2)
+	server.sendto(m2.convert_to_string().encode(), ('<broadcast>', int(port2)))
 print("----------------------------------------------------------------------------------------------------")
 
 
@@ -331,8 +258,11 @@ ap.add_argument("-slink", "--stream_link", type=str, required=False,help="stream
 ap.add_argument("-m", "--medium", type=str, required=False,choices=['air','water'],help="choose the camera medium")
 ap.add_argument("-p1", "--port1", type=str, required=False,help="port 1")
 ap.add_argument("-p2", "--port2", type=str, required=False,help="port 2")
-
+ap.add_argument("-out", "--output_file", type=str, required=False,help="redirect to output file")
+ap.add_argument("-conn_test", "--conn_test", type=str, required=False,choices=['True','False'],help="Test connection before startup")
 args = vars(ap.parse_args())
+print(args)
+
 weights_path = args["weight"]
 config_path = args["config"]
 hoop_size = args["size"]
@@ -347,6 +277,9 @@ stream_link = default_stream_link if args["stream_link"]==None else args["stream
 medium =  "air" if args["medium"]==None else args["medium"]
 port1 =  "51110" if args["port1"]==None else args["port1"]
 port2 =  "51120" if args["port2"]==None else args["port2"]
+conn_test =  True if args["conn_test"]=='True' else False
+output_file = "output.txt" if args["output_file"]==None else args["output_file"]
+
 
 print(weights_path)
 print(config_path)
@@ -356,6 +289,11 @@ print("show lights is",show_lights)
 print("Processing every nth frame",multiplier)
 print(args)
 
+
+
+#sys.stdout = open(output_file, 'w')
+sys.stdout = open(os.devnull, 'w')
+print('printing to file',output_file)
 
 server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
 server.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
@@ -389,11 +327,24 @@ model_points_small = np.array([
                                         (32,11, 0.0)
                                     ])
 if source=="stream":
-        vidcap = cv2.VideoCapture(stream_link)
+	if conn_test==True:
+		logger.info("Testing camera connection")
+		while(1):
+			vidcap = cv2.VideoCapture(stream_link)
+			print(vidcap)
+			if vidcap is None or not vidcap.isOpened():
+				print(vidcap)
+				logger.info('Warning: unable to open video source: ',stream_link)
+				send_camera_error_messages(server,port1,port2)
+			else:
+				logger.info("Camera is connected")
+				break
+	else:
+		vidcap = cv2.VideoCapture(stream_link)
 else:
-        vidcap = cv2.VideoCapture(video_link)
-
-
+	vidcap = cv2.VideoCapture(video_link)
+	        
+      
 if hoop_size=="small":
     model_points = model_points_small
 elif hoop_size=="big":
@@ -426,29 +377,15 @@ print("Model config",model_points)
 
 # In[10]:
 
-
 with open(config_path,'rb') as f:
     cfg = pickle.load(f)
     model = model_from_json(cfg)
-    
-
 with open(weights_path,'rb') as f:
-    weights = pickle.load(f)
-    model.set_weights(weights)
-
-
-#idx = 500
-#image = cv2.imread('/tf/data/stream3_images/'+str(idx)+'.jpg')
-#image = cv2.imread('/tf/data/stream2/7202.jpg')
-
-
-
-
-
-
-
-
-
+	weights = pickle.load(f)
+	model.set_weights(weights)
+avail = True
+print("GPU available")
+   
 seconds = 0.5
 #fps = vidcap.get(cv2.CAP_PROP_FPS) # Gets the frames per second
 
@@ -546,14 +483,14 @@ while success:
             for tup in kmeans.cluster_centers_:
                 image = cv2.circle(image,(int(tup[0]),int(tup[1])), 5, (255,0,0), -1)
                 final_tuples.append((int(tup[0]),int(tup[1])))
-            logger.info("more than 5 landmarks clustering")
+            print("more than 5 landmarks clustering")
             contour5_flag = True
         else:
             if len(tuples)==5:
-                logger.info("equal to five landmarks found")
+                print("equal to five landmarks found")
                 contour5_flag = True
             else:
-                logger.info("less than five landmarks found")
+                print("less than five landmarks found")
                 contour5_flag = False
             for tup in tuples:
                 image = cv2.circle(image,(tup[0],tup[1]), 5, (255,0,0), -1)
@@ -608,7 +545,7 @@ while success:
         m2.set_number_of_lights(len(image_points))
         
         if contour5_flag==True:
-            logger.info("entered")
+            print("entered")
             
             # Camera internals
 
@@ -628,14 +565,14 @@ while success:
             dist_coeffs = np.array([[-0.3023023,0.14315257,-0.00201115,-0.00041268,-0.04129913]])
             (success, rotation_vector, translation_vector) = cv2.solvePnP(model_points, image_points, camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_ITERATIVE)
             if medium=="water":
-                        logger.info("Scaling translation vector by 1.33") 
+                        print("Scaling translation vector by 1.33") 
                         translation_vector = translation_vector*1.33        
             print("euler calcluting")
             print(rotation_vector)
             rot_mat, _ = cv2.Rodrigues(rotation_vector)
             print(rot_mat)  
             euler_angles = rotationMatrixToEulerAngles(rot_mat)
-            logger.info("euler calculated")
+            print("euler calculated")
 
 
 
@@ -705,11 +642,12 @@ while success:
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
     m1.set_date_time()
+    m1.set_camera_status(1)
     m1.set_checksum()
-    m1.set_camera_status(success)
     m2.set_date_time()
+    m2.set_camera_status(1)
     m2.set_checksum()
-    m2.set_camera_status(success)
+    
     
     
     if frameId % multiplier==0:
@@ -718,9 +656,9 @@ while success:
         logger.info("Message 1 is %s",m1.convert_to_string())
         logger.info("Message 2 is %s",m2.convert_to_string())
     
-        logger.info("Sending m1 to port:"+port1)
+        print("Sending m1 to port:"+port1)
         server.sendto(m1.convert_to_string().encode(), ('<broadcast>', int(port1)))
-        logger.info("Sending m2 to port:"+port2)
+        print("Sending m2 to port:"+port2)
         server.sendto(m2.convert_to_string().encode(), ('<broadcast>', int(port2)))
     
     
@@ -735,7 +673,7 @@ while success:
         
     print('Read a new frame: ', success)
     
-
+sys.exit()
 
 # In[ ]:
 

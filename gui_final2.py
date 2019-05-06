@@ -99,7 +99,12 @@ class Worker(QObject):
         string = string + " -skip " + str(self.widgets.spinBox.value())
         string = string + " -p1 " + str(self.widgets.m1_port.text())
         string = string + " -p2 " + str(self.widgets.m2_port.text())
-        print(string)                                 
+        print(string)
+        #file_name = "commmand.txt" 
+        #with open(file_name,"wb") as f:
+        #	f.write(string)
+        #	print("writing command to file=> ",file_name)
+                                 
         #self.p1 = subprocess.Popen(string.split(" "))
             #print("I'm running")
             #time.sleep(1)
@@ -184,10 +189,13 @@ class WidgetGallery(QDialog):
         self.topLeftGroupBox = QGroupBox("Source/Ports")
 
         radioButton1 = QRadioButton("Stream")
+        self.stream_checkbox = QCheckBox("default link")
+        self.stream_checkbox.setChecked(True)
         openVideo = QPushButton("Open Video")
         self.file_link = QLineEdit('stream2.mp4')
-        #lineEdit = QLineEdit('rtsp://admin:admin@192.168.214.40/h264.sdp?res=half&x0=0&y0=0&x1=1920&y1=1080&qp=16&doublescan=0&ssn=41645')
-       
+        self.stream_link = QLineEdit('rtsp://admin:admin@192.168.214.40/h264.sdp?res=half&x0=0&y0=0&x1=1920&y1=1080&qp=16&doublescan=0&ssn=41645')
+        self.stream_link.setEnabled(False)
+        
         radioButton1.toggled.connect(openVideo.setDisabled)
         radioButton1.toggled.connect(self.file_link.setDisabled)
         self.radioButton2 = QRadioButton("Video")
@@ -198,6 +206,7 @@ class WidgetGallery(QDialog):
         
         
         openVideo.clicked.connect(self.getfiles)
+        self.stream_checkbox.stateChanged.connect(self.toggle_stream_link)
         self.label = QLabel("Ports:")
         self.m1_port = QLineEdit('51110')
         self.m2_port = QLineEdit('51120')
@@ -206,18 +215,24 @@ class WidgetGallery(QDialog):
 
         
         layout = QGridLayout()
-        layout.addWidget(radioButton1, 0, 0, 1, 2)
-        #layout.addWidget(lineEdit, 1, 0, 1, 2)
-        layout.addWidget(self.radioButton2, 1, 0, 1, 2)
-        layout.addWidget(self.file_link, 2, 0)
-        layout.addWidget(openVideo, 2, 1, 1, 1)
+        layout.addWidget(radioButton1, 0, 0)
+        layout.addWidget(self.stream_checkbox, 0, 1, 1, 1)
+        layout.addWidget(self.stream_link, 1, 0)
+        layout.addWidget(self.radioButton2, 2, 0, 1, 2)
+        layout.addWidget(self.file_link, 3, 0)
+        layout.addWidget(openVideo, 3, 1, 1, 1)
         
-        layout.addWidget(self.label, 3, 0)
-        layout.addWidget(self.m1_port, 4, 0,1,1)
-        layout.addWidget(self.m2_port, 4, 1,1,1)
+        layout.addWidget(self.label, 4, 0)
+        layout.addWidget(self.m1_port, 5, 0,1,1)
+        layout.addWidget(self.m2_port, 5, 1,1,1)
         #layout.addWidget(self.tst_btn, 4, 0)
         #layout.addStretch(1)
-        self.topLeftGroupBox.setLayout(layout)    
+        self.topLeftGroupBox.setLayout(layout)
+    def toggle_stream_link(self,state):
+        if state > 0:
+            self.stream_link.setEnabled(False)
+        else:
+            self.stream_link.setEnabled(True)        
 
     def createTopRightGroupBox(self):
         self.topRightGroupBox = QGroupBox("Start/Stop and Tests")
@@ -227,6 +242,8 @@ class WidgetGallery(QDialog):
         #defaultPushButton.clicked.connect(self.on_button_clicked)
         
         self.togglePushButton = QPushButton("Generate Command")
+        self.checkConnectionStartup = QCheckBox("Test connection before startup")
+        self.checkConnectionStartup.setChecked(True)
         #self.togglePushButton.setCheckable(True)
         #self.togglePushButton.setDisabled(True)
         #togglePushButton.setChecked(True)
@@ -248,7 +265,8 @@ class WidgetGallery(QDialog):
         layout.addWidget(self.defaultPushButton, 0, 0, 1, 2)
         layout.addWidget(self.togglePushButton, 1, 0, 1, 2)
         #layout.addWidget(self.tst_btn,2, 0, 1, 2)
-        layout.addWidget(self.stream_tst_btn,2, 0, 1, 2)
+        layout.addWidget(self.stream_tst_btn,2, 0,1,2)
+        layout.addWidget(self.checkConnectionStartup,3,0)
         #layout.addStretch(1)
         self.topRightGroupBox.setLayout(layout)
     def ping_to_stream(self):
@@ -279,6 +297,9 @@ class WidgetGallery(QDialog):
         if self.radioButton2.isChecked() == True:
                 video_link = self.file_link.text()
                 string = string + " -src video -video "+video_link
+        else:
+        	if self.stream_checkbox.isChecked()==False:
+        		string = string + " -slink "+self.stream_link.text()        
         hoop_size = ""
         if self.bigRadioButton.isChecked()==True:
                 hoop_size = "big"
@@ -295,12 +316,25 @@ class WidgetGallery(QDialog):
         if self.save_video.isChecked()==True:
                 string = string + " -save_video True"
         if self.showLightPositions.isChecked()==True:
-                string = string + " -l True"                                    
+                string = string + " -l True"
+        if self.checkConnectionStartup.isChecked()==True:
+                string = string + " -conn_test True"
+        else:
+                string = string + " -conn_test False"                                                            
         string = string + " -m "+ medium
         string = string + " -skip " + str(self.spinBox.value())
         string = string + " -p1 " + str(self.m1_port.text())
         string = string + " -p2 " + str(self.m2_port.text())
         self.defaultPushButton.setText(string)
+        pre_commands_file = "pre_commands.txt"
+        file_name = "command.sh"
+        with open(pre_commands_file,"r") as f:
+        	pre_commands = f.read()
+        print("Pre commands",pre_commands)
+        string = pre_commands + string 	 
+        with open(file_name,"w") as f:
+        	f.write(string)
+        	print("writing command to file=> ",file_name)
         return string
     def start_loop(self):
         print("hello")

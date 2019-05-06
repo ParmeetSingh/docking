@@ -4,6 +4,7 @@ import xml.etree.ElementTree as ET
 import tensorflow as tf
 import copy
 import cv2
+from datetime import datetime
 
 class BoundBox:
     def __init__(self, xmin, ymin, xmax, ymax, c = None, classes = None):
@@ -206,3 +207,98 @@ def _softmax(x, axis=-1, t=-100.):
     e_x = np.exp(x)
     
     return e_x / e_x.sum(axis, keepdims=True)
+class Message:
+    def __init__(self):    
+        self.message_type = "001"
+        self.date = ""
+        self.time = ""
+        self.target_range = -10
+        self.target_heading = 0
+        self.elevation = 0
+        self.target_quality = 1
+        self.number_of_lights = -1
+        self.camera_status = 0
+        self.checksum = ""
+    def set_target_detected(self,target_quality):
+        self.target_quality = target_quality    
+    def set_number_of_lights(self,num_lights):
+        self.number_of_lights = num_lights       
+    def set_camera_status(self,status):	
+    	self.camera_status = status        
+    def convert_to_string(self):
+    	return ",".join(["$PISE","CAM2VCC",self.message_type,self.date,self.time,"{0:.1f}".format(self.target_range),"{0:.1f}".format(self.target_heading),"{0:.1f}".format(self.elevation),str(self.target_quality),str(self.number_of_lights),str(self.camera_status),self.checksum])	
+    def set_date_time(self):
+    	self.date = datetime.now().strftime('%Y%m%d')
+    	self.time = datetime.now().strftime('%H:%M:%S.%f')[:-4]
+    def fill_target_heading_elevation(self,translation_vector,heading,elevation):
+    	x = np.array([translation_vector[0][0],translation_vector[1][0],translation_vector[2][0]])
+    	self.target_range = np.linalg.norm(x)/100#convert cm to m
+    	self.target_heading =  heading
+    	self.elevation =  elevation
+    def set_checksum(self):
+    	chk_sum_string = "".join(["$PISE","CAM2VCC",self.message_type,self.date,self.time,"{0:.1f}".format(self.target_range),"{0:.1f}".format(self.target_heading),"{0:.1f}".format(self.elevation),str(self.target_quality),str(self.number_of_lights),str(self.camera_status)])
+    	calc_cksum = 0
+    	for s in chk_sum_string:
+    	    	calc_cksum ^= ord(s)
+    	self.checksum = str(hex(calc_cksum)).lstrip("0").lstrip("x")
+
+class Message2:
+    def __init__(self):    
+        self.message_type = "002"
+        self.date = ""
+        self.time = ""
+        self.number_lights = 0
+        self.light1_x_pos = 0
+        self.light1_y_pos = 0
+        self.light2_x_pos = 0
+        self.light2_y_pos = 0
+        self.light3_x_pos = 0
+        self.light3_y_pos = 0
+        self.light4_x_pos = 0
+        self.light4_y_pos = 0
+        self.light5_x_pos = 0
+        self.light5_y_pos = 0
+        self.light6_x_pos = 0
+        self.light6_y_pos = 0
+        self.camera_status = 0
+        self.checksum = ""
+    def set_number_of_lights(self,num_lights):
+        self.number_of_lights = num_lights                  
+    def set_camera_status(self,status):
+        self.camera_status = status
+    def fill_light_positions(self,image_points):
+    	self.number_lights = len(image_points)
+    	if len(image_points)>=1:
+    		self.light1_x_pos = image_points[0][0][0]
+    		self.light1_y_pos = image_points[0][1][0]
+    	if len(image_points)>=2:
+    		self.light2_x_pos = image_points[1][0][0]
+    		self.light2_y_pos = image_points[1][1][0]
+    	if len(image_points)>=3:
+    		self.light3_x_pos = image_points[2][0][0]
+    		self.light3_y_pos = image_points[2][1][0]
+    	if len(image_points)>=4:
+    		self.light4_x_pos = image_points[3][0][0]
+    		self.light4_y_pos = image_points[3][1][0]
+    	if len(image_points)>=5:
+    		self.light5_x_pos = image_points[4][0][0]
+    		self.light5_y_pos = image_points[4][1][0]
+    	if len(image_points)>=6:
+    		self.light6_x_pos = image_points[5][0][0]
+    		self.light6_y_pos = image_points[5][1][0] 
+    def convert_to_string(self):
+        print(self.message_type)
+        return ",".join(["$PISE","CAM2VCC",self.message_type,self.date,self.time,str(self.number_lights),"{0:.1f}".format(self.light1_x_pos),"{0:.1f}".format(self.light1_y_pos),"{0:.1f}".format(self.light2_x_pos),"{0:.1f}".format(self.light2_y_pos),"{0:.1f}".format(self.light3_x_pos),"{0:.1f}".format(self.light3_y_pos),"{0:.1f}".format(self.light4_x_pos),"{0:.1f}".format(self.light4_y_pos),"{0:.1f}".format(self.light5_x_pos),"{0:.1f}".format(self.light5_y_pos),"{0:.1f}".format(self.light6_x_pos),"{0:.1f}".format(self.light6_y_pos),str(self.camera_status),str(self.checksum)])
+    def set_date_time(self):
+    	self.date = datetime.now().strftime('%Y%m%d')
+    	self.time = datetime.now().strftime('%H:%M:%S.%f')[:-4]	        
+    def set_checksum(self):
+    	chk_sum_string = "".join(["$PISE","CAM2VCC",self.message_type,self.date,self.time,str(self.number_lights),"{0:.1f}".format(self.light1_x_pos),"{0:.1f}".format(self.light1_y_pos),"{0:.1f}".format(self.light2_x_pos),"{0:.1f}".format(self.light2_y_pos),"{0:.1f}".format(self.light3_x_pos),"{0:.1f}".format(self.light3_y_pos),"{0:.1f}".format(self.light4_x_pos),"{0:.1f}".format(self.light4_y_pos),"{0:.1f}".format(self.light5_x_pos),"{0:.1f}".format(self.light5_y_pos),"{0:.1f}".format(self.light6_x_pos),"{0:.1f}".format(self.light6_y_pos),str(self.camera_status)])
+    	calc_cksum = 0
+    	for s in chk_sum_string:
+    	    	calc_cksum ^= ord(s)
+    	self.checksum = str(hex(calc_cksum)).lstrip("0").lstrip("x")
+def ping_to_stream(hostname):
+        response = os.system("ping -c 1 " + hostname)
+        
+        return response    	      
