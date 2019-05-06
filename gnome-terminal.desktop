@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Name=Test        
+Comment=Test the terminal running a command inside it
+Exec=/usr/bin/gnome-terminal --working-directory=/home/nvidia/docking -e "bash -c ~/docking/command.sh;bash" &
+Icon=utilities-terminal
+Terminal=true 
+Type=Application
+Categories=Application
+#X-GNOME-Autostart-Delay=10
+#X-GNOME-Autostart-enabled=true;
