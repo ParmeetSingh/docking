@@ -334,7 +334,7 @@ if source=="stream":
 			print(vidcap)
 			if vidcap is None or not vidcap.isOpened():
 				print(vidcap)
-				logger.info('Warning: unable to open video source: ',stream_link)
+				logger.info('Warning: unable to open video source: '+stream_link)
 				send_camera_error_messages(server,port1,port2)
 			else:
 				logger.info("Camera is connected")
